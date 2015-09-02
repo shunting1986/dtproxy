@@ -22,9 +22,14 @@ class HandlerClass(SimpleHTTPRequestHandler):
 		self.send_response(resp.status)
 
 		for h in resp.getheaders():
+			# the chunk encoding has already been processed by the library, 
+			# don't send it to client
+			if h[0].lower() == "transfer-encoding" and h[1].lower() == "chunked":
+				continue
 			self.send_header(h[0], h[1])
 		self.end_headers()
-		self.wfile.write(resp.read())
+		respbody = resp.read()
+		self.wfile.write(respbody)
 
 	def forward_request(self):
 		uri = self.path
@@ -57,7 +62,6 @@ class HandlerClass(SimpleHTTPRequestHandler):
 		headers = {name: self.headers[name] for name in self.headers }
 
 		del headers["Proxy-Connection"]
-		# del headers["User-Agent"] # TODO fix the problem caused by user agent
 		conn.request(cmd, resource, None, headers)
 
 		resp = conn.getresponse()
