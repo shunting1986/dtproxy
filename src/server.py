@@ -5,6 +5,9 @@ import sys
 class InvalidRequest(Exception):
 	pass
 
+class NotSupportedError(Exception):
+	pass
+
 class HandlerClass(SimpleHTTPRequestHandler):
 	# Override since the implementation in base class will send extra headers
 	def send_response(self, code):
@@ -17,17 +20,47 @@ class HandlerClass(SimpleHTTPRequestHandler):
 
 	def forward_response(self, resp):
 		self.send_response(resp.status)
-		for h in resp.headers:
-			self.send_header(h, resp.headers[h])
+
+		for h in resp.getheaders():
+			self.send_header(h[0], h[1])
 		self.end_headers()
 		self.wfile.write(resp.read())
 
-	# TODO: just call baidu.com right now
 	def forward_request(self):
-		conn = HTTPConnection("www.baidu.com", 80)
-		conn.request("GET", "/")
-		resp = conn.getresponse()
+		uri = self.path
+		if uri.startswith("https://"):
+			raise NotSupportedError("https not supported yet")	
+		elif uri.startswith("http://"):
+			uri = uri[len("http://") :]
+		else:
+			raise InvalidRequest("Invalid uri for proxy: {0}".format(uri))
 
+		start_ind = uri.find("/")
+		if start_ind == -1:
+			start_ind = uri.find("?")
+
+		if start_ind == -1:
+			addr = uri
+			resource = "/"
+		else:
+			addr = uri[:start_ind]
+			resource = uri[start_ind:]
+
+		if not resource.startswith("/"):
+			resource = "/" + resource
+
+		conn = HTTPConnection(addr)
+		cmd = self.command
+
+		if cmd not in ["GET"]:
+			raise NotSupportedError("http method {0} not supported".format(cmd))
+		headers = {name: self.headers[name] for name in self.headers }
+
+		del headers["Proxy-Connection"]
+		# del headers["User-Agent"] # TODO fix the problem caused by user agent
+		conn.request(cmd, resource, None, headers)
+
+		resp = conn.getresponse()
 		self.forward_response(resp)
 
 	def handle_one_request(self):
@@ -57,30 +90,3 @@ class Server:
 			print("\nKeyboard interrupt received, exiting.")
 			httpd.server_close()
 			sys.exit(0)
-
-### WSGI implementation
-# from wsgiref.simple_server import make_server
-# 
-# def req_handler(environ, start_response):
-# 	cl = environ.get("CONTENT_LENGTH", None)
-# 	for x in environ:
-# 		print(x)
-# 		print("\t{0}".format(environ[x]))
-# 	
-# 	if cl:
-# 		body = environ["wsgi.input"].read(int(cl))
-# 	else:
-# 		body = environ["wsgi.input"].read()
-# 	print("body:")
-# 	print(body)
-# 	print()
-# 
-# 	print("Enter req_handler") # TODO
-# 
-# class Server:
-# 	def __init__(self, host, port):
-# 		self.httpd = make_server(host, port, req_handler)
-# 		print("Serving on port {0}".format(port))
-# 	
-# 	def start(self):
-# 		self.httpd.serve_forever()
