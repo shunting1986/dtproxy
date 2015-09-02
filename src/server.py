@@ -1,8 +1,46 @@
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.client import HTTPConnection
 import sys
 
-class HandlerClass(SimpleHTTPRequestHandler):
+class InvalidRequest(Exception):
 	pass
+
+class HandlerClass(SimpleHTTPRequestHandler):
+	# Override since the implementation in base class will send extra headers
+	def send_response(self, code):
+		if code in self.responses:
+			message = self.responses[code][0]
+		else:
+			message = ""
+		self.wfile.write(("%s %d %s\r\n" % (self.protocol_version, code, message))
+			.encode("ASCII", "strict"))
+
+	def forward_response(self, resp):
+		self.send_response(resp.status)
+		for h in resp.headers:
+			self.send_header(h, resp.headers[h])
+		self.end_headers()
+		self.wfile.write(resp.read())
+
+	# TODO: just call baidu.com right now
+	def forward_request(self):
+		conn = HTTPConnection("www.baidu.com", 80)
+		conn.request("GET", "/")
+		resp = conn.getresponse()
+
+		self.forward_response(resp)
+
+	def handle_one_request(self):
+		self.raw_requestline = self.rfile.readline()
+		if not self.raw_requestline:
+			return
+		if not self.parse_request():
+			raise InvalidRequest("Fail to parse the http request")
+
+		print("Handle req: {0}".format(self.raw_requestline))
+
+		self.forward_request()
+		self.close_connection = 1 # mandate to close connection right now
 
 class Server:
 	def __init__(self, host, port):
