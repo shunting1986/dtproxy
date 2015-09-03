@@ -31,6 +31,11 @@ class HandlerClass(SimpleHTTPRequestHandler):
 		respbody = resp.read()
 		self.wfile.write(respbody)
 
+	# XXX just remove the header and wait for client to timeout right now	
+	def handleExpect100(self, headers):
+		if headers.get("Expect") and headers["Expect"].lower() == "100-continue":
+			del headers["Expect"]
+
 	def forward_request(self):
 		uri = self.path
 		if uri.startswith("https://"):
@@ -57,12 +62,27 @@ class HandlerClass(SimpleHTTPRequestHandler):
 		conn = HTTPConnection(addr)
 		cmd = self.command
 
-		if cmd not in ["GET"]:
+		if cmd not in ["GET", "POST"]:
 			raise NotSupportedError("http method {0} not supported".format(cmd))
-		headers = {name: self.headers[name] for name in self.headers }
 
+		headers = {name: self.headers[name] for name in self.headers }
+		if headers.get("Content-Length"):
+			cl = int(headers["Content-Length"])
+		else:
+			cl = None
+		body = None
+
+		# get body for post
+		if cmd in ["POST"]:
+			self.handleExpect100(headers)
+			if cl:
+				body = self.rfile.read(cl)
+			else:
+				body = self.rfile.read()
+			print("body is [{0}]".format(body))
+			
 		del headers["Proxy-Connection"]
-		conn.request(cmd, resource, None, headers)
+		conn.request(cmd, resource, body, headers)
 
 		resp = conn.getresponse()
 		self.forward_response(resp)
