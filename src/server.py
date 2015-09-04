@@ -1,6 +1,7 @@
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from http.client import HTTPConnection
 from socketserver import ThreadingMixIn
+from tunnel import Tunnel
 import sys
 
 class InvalidRequest(Exception):
@@ -39,6 +40,13 @@ class HandlerClass(SimpleHTTPRequestHandler):
 
 	def forward_request(self):
 		uri = self.path
+		cmd = self.command
+
+		if cmd == "CONNECT":
+			self.send_response(200)
+			self.end_headers()
+			return Tunnel(self.connection, uri).handle()
+
 		if uri.startswith("https://"):
 			raise NotSupportedError("https not supported yet")	
 		elif uri.startswith("http://"):
@@ -61,7 +69,6 @@ class HandlerClass(SimpleHTTPRequestHandler):
 			resource = "/" + resource
 
 		conn = HTTPConnection(addr)
-		cmd = self.command
 
 		if cmd not in ["GET", "POST"]:
 			raise NotSupportedError("http method {0} not supported".format(cmd))
