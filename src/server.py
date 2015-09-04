@@ -1,5 +1,6 @@
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from http.client import HTTPConnection
+from socketserver import ThreadingMixIn
 import sys
 
 class InvalidRequest(Exception):
@@ -99,13 +100,16 @@ class HandlerClass(SimpleHTTPRequestHandler):
 		self.forward_request()
 		self.close_connection = 1 # mandate to close connection right now
 
+class ThreadServer(ThreadingMixIn, HTTPServer):
+	pass
+
 class Server:
 	def __init__(self, host, port):
 		self.host = host
 		self.port = port
 	
 	def start(self):
-		httpd = HTTPServer((self.host, self.port), HandlerClass)
+		httpd = ThreadServer((self.host, self.port), HandlerClass)
 		print("Serving on port {0}".format(self.port))
 
 		try:
