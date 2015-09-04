@@ -44,6 +44,9 @@ class HandlerClass(SimpleHTTPRequestHandler):
 
 		if cmd == "CONNECT":
 			self.send_response(200)
+			# in Python 3.4, end_headers need access _headers_buffer. Invoke send_header
+			# will make sure the field is created
+			self.send_header("Date", self.date_time_string()) 
 			self.end_headers()
 			return Tunnel(self.connection, uri).handle()
 
