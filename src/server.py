@@ -91,8 +91,9 @@ class HandlerClass(SimpleHTTPRequestHandler):
 			else:
 				body = self.rfile.read()
 			print("body is [{0}]".format(body))
-			
-		del headers["Proxy-Connection"]
+
+		if "Proxy-Connection" in headers:
+			del headers["Proxy-Connection"]
 		conn.request(cmd, resource, body, headers)
 
 		resp = conn.getresponse()
